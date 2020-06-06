@@ -34,13 +34,13 @@ Adding it to another Package as a dependency is as easy as adding it to the `dep
 
 ```swift
 dependencies: [
-.package(url: "https://github.com/matis-schotte/PublishedKVO.git", from: "0.1.0")
+	.package(url: "https://github.com/matis-schotte/PublishedKVO.git", from: "0.1.0")
 ]
 ```
 
 ## Usage
 
-```
+```swift
 class Example {
 	@PublishedKVO(\.completedUnitCount)
 	var progress = Progress(totalUnitCount: 2)
@@ -69,7 +69,7 @@ ex.$progress.send(ex.progress) // Emits given value
 
 ° See `Attention` comment from above about SwiftUI and the following example:
 
-```
+```swift
 class Example {
 	@PublishedKVO(\.completedUnitCount)
 	var progress1 = Progress(totalUnitCount: 5)
