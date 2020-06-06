@@ -83,33 +83,34 @@ $progress3 incomming 0.4 actual 0.2
 ```
 */
 @propertyWrapper
-class PublishedKVO<Value: NSObject, B> {
+public class PublishedKVO<Value: NSObject, B> {
 	private let subject: CurrentValueSubject<Value, Never>
 	
 	/// The initializer accepting multiple keyPath's to watch for changes.
 	/// - parameter keyPaths: An array of `KeyPath`s to use with Key-Value-Observing.
-	init(wrappedValue value: Value, _ keyPaths: [KeyPath<Value, B>]) {
+	public init(wrappedValue value: Value, _ keyPaths: [ReferenceWritableKeyPath<Value, B>]) {
 		self.subject = CurrentValueSubject<Value, Never>(value)
 		setupKVO(keyPaths)
 	}
 	
 	/// The initializer accepting a keyPath to watch for changes.
 	/// - parameter keyPath: A `KeyPath` to use with Key-Value-Observing.
-	convenience init(wrappedValue value: Value, _ keyPath: KeyPath<Value, B>) {
+	public convenience init(wrappedValue value: Value, _ keyPath: ReferenceWritableKeyPath<Value, B>) {
 		self.init(wrappedValue: value, [keyPath])
 	}
 	
-	var projectedValue: Publisher { Publisher(subject) }
+	public var projectedValue: Publisher { Publisher(subject) }
 	
-	var wrappedValue: Value {
+	public var wrappedValue: Value {
 		get { subject.value }
 		set { subject.value = newValue } // this works as usual @Published with structs/variable re-assign
 	}
 	
 	private var kvoTokens = [NSKeyValueObservation]()
-	private func setupKVO(_ keyPaths: [KeyPath<Value, B>]) {
+	private func setupKVO(_ keyPaths: [ReferenceWritableKeyPath<Value, B>]) {
 		keyPaths.forEach { keyPath in
-			let kvoToken = subject.value.observe(keyPath) { _, _ in
+			let kvoToken = subject.value.observe(keyPath) { [weak self] _, _ in
+				guard let self = self else { return }
 				// this works different to Combine @Published since the var inside the object is already set when emitting this value
 				self.subject.send(self.subject.value)
 			}
@@ -117,32 +118,28 @@ class PublishedKVO<Value: NSObject, B> {
 		}
 	}
 	
-	deinit {
-		kvoTokens.forEach { $0.invalidate() }
-	}
-	
-	struct Publisher: Combine.Publisher {
-		typealias Output = Value
-		typealias Failure = Never
+	public struct Publisher: Combine.Publisher {
+		public typealias Output = Value
+		public typealias Failure = Never
 		
 		private let subject: CurrentValueSubject<Value, Never>
 		
-		init(_ subject: CurrentValueSubject<Value, Never>) {
+		public init(_ subject: CurrentValueSubject<Value, Never>) {
 			self.subject = subject
 		}
 		
-		func receive<S>(subscriber: S) where S : Subscriber, Self.Failure == S.Failure, Self.Output == S.Input {
+		public func receive<S>(subscriber: S) where S : Subscriber, Self.Failure == S.Failure, Self.Output == S.Input {
 			subject.receive(subscriber: subscriber)
 		}
 		
 		/// Send a new `Value` to all receivers.
 		/// - parameter input: The value of the correct type to send.
-		func send(_ input: Value) {
+		public func send(_ input: Value) {
 			subject.send(input)
 		}
 		
 		/// Emit the current `Value` to all receivers.
-		func emit() {
+		public func emit() {
 			subject.send(subject.value)
 		}
 	}
