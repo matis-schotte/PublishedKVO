@@ -118,6 +118,10 @@ public class PublishedKVO<Value: NSObject, B> {
 		}
 	}
 	
+	deinit {
+		kvoTokens.forEach { $0.invalidate() }
+	}
+	
 	public struct Publisher: Combine.Publisher {
 		public typealias Output = Value
 		public typealias Failure = Never
