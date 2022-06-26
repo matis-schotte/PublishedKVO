@@ -83,15 +83,17 @@ $progress3 incomming 0.4 actual 0.2
 ```
 */
 @propertyWrapper
-public class PublishedKVO<Value: NSObject> {
+public class PublishedKVO<Value: NSObject>: NSObject {
 	private let subject: CurrentValueSubject<Value, Never>
-	private let keyPaths: [KeyPath<Value, Any?>]
+	private let keyPaths: [String]
 	
 	/// The initializer accepting multiple keyPath's to watch for changes.
 	/// - parameter keyPaths: An array of `KeyPath`s to use with Key-Value-Observing.
 	public init(wrappedValue value: Value, _ keyPaths: [PartialKeyPath<Value>]) {
 		self.subject = CurrentValueSubject<Value, Never>(value)
-		self.keyPaths = unsafeBitCast(keyPaths, to: [KeyPath<Value, Any?>].self)
+		self.keyPaths = keyPaths.map { $0._kvcKeyPathString! }
+		
+		super.init()
 		setupKVO()
 	}
 	
@@ -112,21 +114,20 @@ public class PublishedKVO<Value: NSObject> {
 		} // this works as usual @Published with structs/variable re-assign
 	}
 	
-	private var kvoTokens = [NSKeyValueObservation]()
+	public override func observeValue(forKeyPath keyPath: String?, of object: Any?, change: [NSKeyValueChangeKey : Any]?, context: UnsafeMutableRawPointer?) {
+		// this works different to Combine @Published since the var inside the object is already set when emitting this value
+		self.subject.send(self.subject.value)
+	}
+	
 	private func setupKVO() {
 		keyPaths.forEach { keyPath in
-			let kvoToken = subject.value.observe(keyPath) { [weak self] _, _ in
-				guard let self = self else { return }
-				// this works different to Combine @Published since the var inside the object is already set when emitting this value
-				self.subject.send(self.subject.value)
-			}
-			kvoTokens.append(kvoToken)
+			subject.value.addObserver(self, forKeyPath: keyPath, context: nil)
 		}
 	}
+	
 	private func cleanupKVO() {
-		kvoTokens.removeAll {
-			$0.invalidate()
-			return true
+		keyPaths.forEach { keyPath in
+			subject.value.removeObserver(self, forKeyPath: keyPath)
 		}
 	}
 	
