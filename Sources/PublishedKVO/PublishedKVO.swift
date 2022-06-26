@@ -85,16 +85,16 @@ $progress3 incomming 0.4 actual 0.2
 @propertyWrapper
 public class PublishedKVO<Value: NSObject>: NSObject {
 	private let subject: CurrentValueSubject<Value, Never>
-	private let keyPaths: [String]
+	private let keyPaths: Set<String>
 	
 	/// The initializer accepting multiple keyPath's to watch for changes.
-	/// - parameter keyPaths: An array of `KeyPath`s to use with Key-Value-Observing.
-	public init(wrappedValue value: Value, _ keyPaths: [PartialKeyPath<Value>]) {
+	/// - parameter keyPaths: A set of `KeyPath`s to use with Key-Value-Observing.
+	public init(wrappedValue value: Value, _ keyPaths: Set<PartialKeyPath<Value>>) {
 		self.subject = CurrentValueSubject<Value, Never>(value)
-		self.keyPaths = keyPaths.map { keyPath in
+		self.keyPaths = Set(keyPaths.lazy.map { keyPath in
 			guard let str = keyPath._kvcKeyPathString else { fatalError("Could not extract a String from KeyPath \(keyPath)") }
 			return str
-		}
+		})
 		
 		super.init()
 		setupKVO()
