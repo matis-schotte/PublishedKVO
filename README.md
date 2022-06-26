@@ -53,7 +53,7 @@ let ex = Example()
 
 // Set up the publishers
 let c1 = ex.$progress.sink { print("\($0.fractionCompleted) completed") }
-let c1 = ex.$textualRepresentation.sink { print("\($0)") }
+let c2 = ex.$textualRepresentation.sink { print("\($0)") }
 
 // Interact with the class as usual
 ex.progress.completedUnitCount += 1
