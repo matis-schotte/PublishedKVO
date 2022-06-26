@@ -91,8 +91,8 @@ public class PublishedKVO<Value: NSObject>: NSObject {
 	/// - parameter keyPaths: An array of `KeyPath`s to use with Key-Value-Observing.
 	public init(wrappedValue value: Value, _ keyPaths: [PartialKeyPath<Value>]) {
 		self.subject = CurrentValueSubject<Value, Never>(value)
-		self.keyPaths = keyPaths.map {
-			guard let str = $0._kvcKeyPathString else { fatalError("Could not extract a String from KeyPath \($0)") }
+		self.keyPaths = keyPaths.map { keyPath in
+			guard let str = keyPath._kvcKeyPathString else { fatalError("Could not extract a String from KeyPath \(keyPath)") }
 			return str
 		}
 		
