@@ -22,7 +22,7 @@ let ex = Example()
 
 // Set up the publishers
 let c1 = ex.$progress.sink { print("\($0.fractionCompleted) completed") }
-let c1 = ex.$textualRepresentation.sink { print("\($0)") }
+let c2 = ex.$textualRepresentation.sink { print("\($0)") }
 
 // Interact with the class as usual
 ex.progress.completedUnitCount += 1
@@ -83,19 +83,26 @@ $progress3 incomming 0.4 actual 0.2
 ```
 */
 @propertyWrapper
-public class PublishedKVO<Value: NSObject, B> {
+public class PublishedKVO<Value: NSObject>: NSObject {
 	private let subject: CurrentValueSubject<Value, Never>
+	private let keyPaths: Set<String>
 	
 	/// The initializer accepting multiple keyPath's to watch for changes.
-	/// - parameter keyPaths: An array of `KeyPath`s to use with Key-Value-Observing.
-	public init(wrappedValue value: Value, _ keyPaths: [ReferenceWritableKeyPath<Value, B>]) {
+	/// - parameter keyPaths: A set of `KeyPath`s to use with Key-Value-Observing.
+	public init(wrappedValue value: Value, _ keyPaths: Set<PartialKeyPath<Value>>) {
 		self.subject = CurrentValueSubject<Value, Never>(value)
-		setupKVO(keyPaths)
+		self.keyPaths = Set(keyPaths.lazy.map {
+			guard let str = $0._kvcKeyPathString else { fatalError("Could not extract a String from KeyPath \($0)") }
+			return str
+		})
+		
+		super.init()
+		startKVO()
 	}
 	
 	/// The initializer accepting a keyPath to watch for changes.
 	/// - parameter keyPath: A `KeyPath` to use with Key-Value-Observing.
-	public convenience init(wrappedValue value: Value, _ keyPath: ReferenceWritableKeyPath<Value, B>) {
+	@inlinable public convenience init(wrappedValue value: Value, _ keyPath: PartialKeyPath<Value>) {
 		self.init(wrappedValue: value, [keyPath])
 	}
 	
@@ -103,24 +110,27 @@ public class PublishedKVO<Value: NSObject, B> {
 	
 	public var wrappedValue: Value {
 		get { subject.value }
-		set { subject.value = newValue } // this works as usual @Published with structs/variable re-assign
+		set {
+			stopKVO()
+			subject.value = newValue
+			startKVO()
+		} // this works as usual @Published with structs/variable re-assign
 	}
 	
-	private var kvoTokens = [NSKeyValueObservation]()
-	private func setupKVO(_ keyPaths: [ReferenceWritableKeyPath<Value, B>]) {
-		keyPaths.forEach { keyPath in
-			let kvoToken = subject.value.observe(keyPath) { [weak self] _, _ in
-				guard let self = self else { return }
-				// this works different to Combine @Published since the var inside the object is already set when emitting this value
-				self.subject.send(self.subject.value)
-			}
-			kvoTokens.append(kvoToken)
-		}
+	public override func observeValue(forKeyPath keyPath: String?, of object: Any?, change: [NSKeyValueChangeKey : Any]?, context: UnsafeMutableRawPointer?) {
+		// this works different to Combine @Published since the var inside the object is already set when emitting this value
+		subject.send(subject.value)
 	}
 	
-	deinit {
-		kvoTokens.forEach { $0.invalidate() }
+	private func startKVO() {
+		keyPaths.forEach { subject.value.addObserver(self, forKeyPath: $0, context: nil) }
 	}
+	
+	private func stopKVO() {
+		keyPaths.forEach { subject.value.removeObserver(self, forKeyPath: $0) }
+	}
+	
+	deinit { stopKVO() }
 	
 	public struct Publisher: Combine.Publisher {
 		public typealias Output = Value
