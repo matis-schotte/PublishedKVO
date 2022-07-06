@@ -91,13 +91,13 @@ public class PublishedKVO<Value: NSObject>: NSObject {
 	/// - parameter keyPaths: A set of `KeyPath`s to use with Key-Value-Observing.
 	public init(wrappedValue value: Value, _ keyPaths: Set<PartialKeyPath<Value>>) {
 		self.subject = CurrentValueSubject<Value, Never>(value)
-		self.keyPaths = Set(keyPaths.lazy.map { keyPath in
-			guard let str = keyPath._kvcKeyPathString else { fatalError("Could not extract a String from KeyPath \(keyPath)") }
+		self.keyPaths = Set(keyPaths.lazy.map {
+			guard let str = $0._kvcKeyPathString else { fatalError("Could not extract a String from KeyPath \($0)") }
 			return str
 		})
 		
 		super.init()
-		setupKVO()
+		startKVO()
 	}
 	
 	/// The initializer accepting a keyPath to watch for changes.
@@ -111,30 +111,26 @@ public class PublishedKVO<Value: NSObject>: NSObject {
 	public var wrappedValue: Value {
 		get { subject.value }
 		set {
-			cleanupKVO()
+			stopKVO()
 			subject.value = newValue
-			setupKVO()
+			startKVO()
 		} // this works as usual @Published with structs/variable re-assign
 	}
 	
 	public override func observeValue(forKeyPath keyPath: String?, of object: Any?, change: [NSKeyValueChangeKey : Any]?, context: UnsafeMutableRawPointer?) {
 		// this works different to Combine @Published since the var inside the object is already set when emitting this value
-		self.subject.send(self.subject.value)
+		subject.send(subject.value)
 	}
 	
-	private func setupKVO() {
-		keyPaths.forEach { keyPath in
-			subject.value.addObserver(self, forKeyPath: keyPath, context: nil)
-		}
+	private func startKVO() {
+		keyPaths.forEach { subject.value.addObserver(self, forKeyPath: $0, context: nil) }
 	}
 	
-	private func cleanupKVO() {
-		keyPaths.forEach { keyPath in
-			subject.value.removeObserver(self, forKeyPath: keyPath)
-		}
+	private func stopKVO() {
+		keyPaths.forEach { subject.value.removeObserver(self, forKeyPath: $0) }
 	}
 	
-	deinit { cleanupKVO() }
+	deinit { stopKVO() }
 	
 	public struct Publisher: Combine.Publisher {
 		public typealias Output = Value
